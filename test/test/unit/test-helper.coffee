@@ -6,7 +6,7 @@ $httpBackend      = null
 $rootScope        = null
 $location         = null
 $interval         = null
-$provider         = null
+$provide          = null
 $timeout          = null
 $window           = null
 $http             = null
@@ -38,9 +38,10 @@ validUser =
 
 # run before each test
 setup ->
-  module 'ng-token-auth', (_$authProvider_, _$locationProvider_, $provide) ->
+  module 'ng-token-auth', (_$authProvider_, _$locationProvider_, _$provide_) ->
     $authProvider     = _$authProvider_
     $locationProvider = _$locationProvider_
+    $provide          = _$provide_
     $authProvider.configure({
       validateOnPageLoad: false
     })

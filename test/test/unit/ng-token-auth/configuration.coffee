@@ -102,7 +102,7 @@ suite 'configuration', ->
     setup ->
       # define custom login response handler
       $authProvider.configure({
-        handleLoginResponse: (resp) -> resp
+        handleLoginResponse: -> (resp) -> resp
       })
 
       # return non-standard login response format
@@ -120,7 +120,7 @@ suite 'configuration', ->
     teardown ->
       # restore default login response handler
       $authProvider.configure({
-        handleLoginResponse: (resp) -> resp.data
+        handleLoginResponse: -> (resp) -> resp.data
       })
 
     test 'new user is defined in the root scope', ->
@@ -144,7 +144,7 @@ suite 'configuration', ->
     setup ->
       # define custom token validation response handler
       $authProvider.configure({
-        handleTokenValidationResponse: (resp) -> resp
+        handleTokenValidationResponse: -> (resp) -> resp
       })
 
       $httpBackend
@@ -160,7 +160,7 @@ suite 'configuration', ->
     teardown ->
       # restore default token validation response handler
       $authProvider.configure({
-        handleTokenValidationResponse: (resp) -> resp.data
+        handleTokenValidationResponse: -> (resp) -> resp.data
       })
 
     test 'new user is defined in the root scope', ->

@@ -44,9 +44,9 @@ angular.module('ng-token-auth', ['ipCookie'])
           # convert from ruby time (seconds) to js time (millis)
           (parseInt(headers['expiry'], 10) * 1000) || null
 
-        handleLoginResponse:           (resp) -> resp.data
-        handleAccountUpdateResponse:   (resp) -> resp.data
-        handleTokenValidationResponse: (resp) -> resp.data
+        handleLoginResponse:           -> (resp) -> resp.data
+        handleAccountUpdateResponse:   -> (resp) -> resp.data
+        handleTokenValidationResponse: -> (resp) -> resp.data
 
         authProviderPaths:
           github:    '/auth/github'
@@ -104,8 +104,9 @@ angular.module('ng-token-auth', ['ipCookie'])
         '$timeout'
         '$rootScope'
         '$interpolate'
-        '$interval'
-        ($http, $q, $location, ipCookie, $window, $timeout, $rootScope, $interpolate, $interval) =>
+        '$interval',
+        '$injector'
+        ($http, $q, $location, ipCookie, $window, $timeout, $rootScope, $interpolate, $interval, $injector) =>
           header:            null
           dfd:               null
           user:              {}
@@ -230,8 +231,11 @@ angular.module('ng-token-auth', ['ipCookie'])
             $http(opts)
               .success((resp) =>
                 @setConfigName(opts.config)
-                authData = @getConfig(opts.config).handleLoginResponse(resp, @)
-                @handleValidAuth(authData)
+
+                config = @getConfig(opts.config)
+                fn = @injectHandler(config.handleLoginResponse)
+
+                @handleValidAuth(fn(resp))
                 $rootScope.$broadcast('auth:login-success', @user)
               )
               .error((resp) =>
@@ -304,7 +308,9 @@ angular.module('ng-token-auth', ['ipCookie'])
             $http(opts)
               .success((resp) =>
 
-                updateResponse = @getConfig().handleAccountUpdateResponse(resp)
+                config = @getConfig(opts.config)
+                fn = @injectHandler(config.handleAccountUpdateResponse)
+                updateResponse = fn(resp)
                 curHeaders = @retrieveData('auth_headers')
 
                 angular.extend @user, updateResponse
@@ -343,6 +349,11 @@ angular.module('ng-token-auth', ['ipCookie'])
                 $rootScope.$broadcast('auth:account-destroy-error', resp)
               )
 
+          # wraps $injector
+          injectHandler: (factory) ->
+            if angular.isString(factory)
+            then $injector.get(factory)
+            else $injector.invoke(factory)
 
           # open external auth provider in separate window, send requests for
           # credentials until api auth callback page responds.
@@ -358,7 +369,6 @@ angular.module('ng-token-auth', ['ipCookie'])
           setConfigName: (configName) ->
             configName ?= defaultConfigName
             @persistData('currentConfigName', configName, configName)
-
 
           # open external window to authentication provider
           openAuthWindow: (provider, opts) ->
@@ -611,8 +621,9 @@ angular.module('ng-token-auth', ['ipCookie'])
 
               $http(opts)
                 .success((resp) =>
-                  authData = @getConfig(opts.config).handleTokenValidationResponse(resp)
-                  @handleValidAuth(authData)
+                  config = @getConfig(opts.config)
+                  fn = @injectHandler(config.handleTokenValidationResponse)
+                  @handleValidAuth(fn(resp))
 
                   # broadcast event for first time login
                   if @firstTimeLogin

@@ -1,21 +1,27 @@
 suite 'custom response interceptors', ->
   suite 'login', ->
+    apiUrl = '/stevia'
+    dfd    = null
+    user =
+      uid: "support@ewide.biz"
+
+    response = {
+      "access_token": "R6cwCGmt7GDOwgt91DlYDcaic5-bFrS8bBJG-QdtM3VFiPA",
+      "token_type":   "bearer",
+      "expires_in":   86399,
+      "userName":     "support@ewide.biz",
+      ".issued":      "Fri, 31 Oct 2014 22:15:44 GMT",
+      ".expires":     "Sat, 01 Nov 2014 22:15:44 GMT"
+    }
+
+    # restore defaults
+    teardown ->
+      $authProvider.configure({
+        apiUrl: '/api'
+        proxyIf: -> false
+      })
+
     suite 'single config', ->
-      apiUrl = '/stevia'
-      dfd    = null
-
-      user =
-        uid: "support@ewide.biz"
-
-      response = {
-        "access_token": "R6cwCGmt7GDOwgt91DlYDcaic5-bFrS8bBJG-QdtM3VFiPA",
-        "token_type":   "bearer",
-        "expires_in":   86399,
-        "userName":     "support@ewide.biz",
-        ".issued":      "Fri, 31 Oct 2014 22:15:44 GMT",
-        ".expires":     "Sat, 01 Nov 2014 22:15:44 GMT"
-      }
-
       setup ->
         $authProvider.configure({
           apiUrl: apiUrl
@@ -27,7 +33,7 @@ suite 'custom response interceptors', ->
           tokenFormat: ->
             'Authorization': 'Bearer {{ token }}'
 
-          handleLoginResponse: (resp, $auth) ->
+          handleLoginResponse: ($auth) -> (resp) ->
             $auth.persistData('auth_headers', {
               'Authorization': 'Bearer '+resp['access_token']
               'expiry': new Date().getTime() + resp['expires_in']
@@ -48,13 +54,6 @@ suite 'custom response interceptors', ->
         })
 
         $httpBackend.flush()
-
-      # restore defaults
-      teardown ->
-        $authProvider.configure({
-          apiUrl: '/api'
-          proxyIf: -> false
-        })
 
       test 'new user is defined in the root scope', ->
         assert.equal(user.uid, $rootScope.user.uid)
@@ -83,3 +82,49 @@ suite 'custom response interceptors', ->
         dfd.then(-> resolved = true)
         $timeout.flush()
         assert(resolved)
+
+    suite 'provider as handler', ->
+      setup ->
+        $provide.provider('loginResponseHandler', {
+          $get: ($auth) ->
+            (resp) ->
+              $auth.persistData('auth_headers', {
+                'Authorization': 'Bearer '+resp['access_token']
+                'expiry': new Date().getTime() + resp['expires_in']
+              })
+
+              return {
+                'uid': resp['userName']
+              }
+        })
+
+        $authProvider.configure({
+          apiUrl: apiUrl
+          validateOnPageLoad: true
+          proxyIf: -> false
+          parseExpiry: (headers) ->
+            headers['expiry']
+
+          tokenFormat: ->
+            'Authorization': 'Bearer {{ token }}'
+
+          handleLoginResponse: 'loginResponseHandler'
+        })
+
+        $httpBackend
+          .expectPOST(apiUrl+'/auth/sign_in')
+          .respond(201, response)
+
+        dfd = $auth.submitLogin({
+          email: user.uid
+          password: 'secret123'
+        })
+
+        $httpBackend.flush()
+
+      test 'new user is defined in the root scope', ->
+        assert.equal(user.uid, $rootScope.user.uid)
+
+      test 'success event should return user info', ->
+        assert $rootScope.$broadcast.calledWithMatch('auth:login-success', user)
+

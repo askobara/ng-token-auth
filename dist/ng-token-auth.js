@@ -48,14 +48,20 @@ angular.module('ng-token-auth', ['ipCookie']).provider('$auth', function() {
       parseExpiry: function(headers) {
         return (parseInt(headers['expiry'], 10) * 1000) || null;
       },
-      handleLoginResponse: function(resp) {
-        return resp.data;
+      handleLoginResponse: function() {
+        return function(resp) {
+          return resp.data;
+        };
       },
-      handleAccountUpdateResponse: function(resp) {
-        return resp.data;
+      handleAccountUpdateResponse: function() {
+        return function(resp) {
+          return resp.data;
+        };
       },
-      handleTokenValidationResponse: function(resp) {
-        return resp.data;
+      handleTokenValidationResponse: function() {
+        return function(resp) {
+          return resp.data;
+        };
       },
       authProviderPaths: {
         github: '/auth/github',
@@ -95,8 +101,8 @@ angular.module('ng-token-auth', ['ipCookie']).provider('$auth', function() {
       return configs;
     },
     $get: [
-      '$http', '$q', '$location', 'ipCookie', '$window', '$timeout', '$rootScope', '$interpolate', '$interval', (function(_this) {
-        return function($http, $q, $location, ipCookie, $window, $timeout, $rootScope, $interpolate, $interval) {
+      '$http', '$q', '$location', 'ipCookie', '$window', '$timeout', '$rootScope', '$interpolate', '$interval', '$injector', (function(_this) {
+        return function($http, $q, $location, ipCookie, $window, $timeout, $rootScope, $interpolate, $interval, $injector) {
           return {
             header: null,
             dfd: null,
@@ -203,10 +209,11 @@ angular.module('ng-token-auth', ['ipCookie']).provider('$auth', function() {
               });
               $http(opts).success((function(_this) {
                 return function(resp) {
-                  var authData;
+                  var config, fn;
                   _this.setConfigName(opts.config);
-                  authData = _this.getConfig(opts.config).handleLoginResponse(resp, _this);
-                  _this.handleValidAuth(authData);
+                  config = _this.getConfig(opts.config);
+                  fn = _this.injectHandler(config.handleLoginResponse);
+                  _this.handleValidAuth(fn(resp));
                   return $rootScope.$broadcast('auth:login-success', _this.user);
                 };
               })(this)).error((function(_this) {
@@ -272,8 +279,10 @@ angular.module('ng-token-auth', ['ipCookie']).provider('$auth', function() {
               });
               return $http(opts).success((function(_this) {
                 return function(resp) {
-                  var curHeaders, key, newHeaders, updateResponse, val, _ref;
-                  updateResponse = _this.getConfig().handleAccountUpdateResponse(resp);
+                  var config, curHeaders, fn, key, newHeaders, updateResponse, val, _ref;
+                  config = _this.getConfig(opts.config);
+                  fn = _this.injectHandler(config.handleAccountUpdateResponse);
+                  updateResponse = fn(resp);
                   curHeaders = _this.retrieveData('auth_headers');
                   angular.extend(_this.user, updateResponse);
                   if (curHeaders) {
@@ -310,6 +319,13 @@ angular.module('ng-token-auth', ['ipCookie']).provider('$auth', function() {
               })(this)).error(function(resp) {
                 return $rootScope.$broadcast('auth:account-destroy-error', resp);
               });
+            },
+            injectHandler: function(factory) {
+              if (angular.isString(factory)) {
+                return $injector.get(factory);
+              } else {
+                return $injector.invoke(factory);
+              }
             },
             authenticate: function(provider, opts) {
               if (opts == null) {
@@ -537,9 +553,10 @@ angular.module('ng-token-auth', ['ipCookie']).provider('$auth', function() {
                 });
                 return $http(opts).success((function(_this) {
                   return function(resp) {
-                    var authData;
-                    authData = _this.getConfig(opts.config).handleTokenValidationResponse(resp);
-                    _this.handleValidAuth(authData);
+                    var config, fn;
+                    config = _this.getConfig(opts.config);
+                    fn = _this.injectHandler(config.handleTokenValidationResponse);
+                    _this.handleValidAuth(fn(resp));
                     if (_this.firstTimeLogin) {
                       $rootScope.$broadcast('auth:email-confirmation-success', _this.user);
                     }
